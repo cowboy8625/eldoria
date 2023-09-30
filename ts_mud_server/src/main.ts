@@ -52,6 +52,7 @@ function handleData(client: Socket, data: Buffer, clientState: ClientState) {
     }
     case STATE.Connected: {
       connected(client, data, clientState);
+      break;
     }
   }
 }
