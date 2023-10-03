@@ -1,0 +1,27 @@
+.containter {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  flex: 1;
+}
+
+.inbox {
+  flex: 8;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.create-messages {
+  flex: 1;
+  display: flex;
+  width: 100vw;
+}
+
+.create-messages form input {
+  width: 100%;
+  flex: 1;
+}
+

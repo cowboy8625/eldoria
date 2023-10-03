@@ -5,16 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>WebSocket Chat</title>
+    <link rel="stylesheet" href="index.css" />
   </head>
   <body>
-    <h1>WebSocket Chat</h1>
-    <div>
-      <input id="message" type="text" placeholder="Type your message..." />
-      <button id="send">Send</button>
+    <div class="containter">
+      <div class="inbox">
+        <ul id="messages"></ul>
+      </div>
+      <div class="create-messages" >
+        <form id="form-data">
+          <input
+            id="message"
+            name="message"
+            type="text"
+            placeholder="Type your message..."
+          />
+        <form>
+      </div>
     </div>
-    <ul id="messages"></ul>
     <script>
       const ws = new WebSocket(`ws://${location.host}/ws`);
+
+      const formElement = document.getElementById('form-data');
+      formElement.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const formData = new FormData(formElement);
+        const message = formData.get('message');
+        console.log("message: ", message);
+        if (!message) {
+          return;
+        }
+        formElement.reset();
+        ws.send(message);
+      });
 
       ws.addEventListener('open', () => {
         console.log('connected');
@@ -23,14 +46,7 @@
       ws.addEventListener('message', (event) => {
         const message = document.createElement('li');
         message.textContent = event.data;
-
         document.getElementById('messages').appendChild(message);
-      });
-
-      document.getElementById('send').addEventListener('click', () => {
-        const message = document.getElementById('message').value;
-
-        ws.send(message);
       });
     </script>
   </body>
