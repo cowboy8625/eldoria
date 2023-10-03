@@ -12,9 +12,14 @@
       <div class="inbox">
         <ul id="messages"></ul>
       </div>
-      <div class="create-messages" >
+      <div class="health-power">
+        <span>HP</span>
+        <span id="hp">0</span>
+      </div>
+      <div class="create-message" >
         <form id="form-data">
           <input
+            class="message-box"
             id="message"
             name="message"
             type="text"
@@ -24,6 +29,7 @@
       </div>
     </div>
     <script>
+      const hpElement = document.getElementById('hp');
       const ws = new WebSocket(`ws://${location.host}/ws`);
 
       const formElement = document.getElementById('form-data');
@@ -44,10 +50,27 @@
       });
 
       ws.addEventListener('message', (event) => {
-        const message = document.createElement('li');
-        message.textContent = event.data;
-        document.getElementById('messages').appendChild(message);
+        const data = JSON.parse(event.data);
+        addMessage(data.message);
+        updateHp(data.hp);
+
       });
+
+      function addMessage(text) {
+        if (!text) {
+          return;
+        }
+        const message = document.createElement('li');
+        message.textContent = text;
+        document.getElementById('messages').appendChild(message);
+      }
+
+      function updateHp(hp) {
+        if (!hp) {
+          return;
+        }
+        hpElement.textContent = hp;
+      }
     </script>
   </body>
 </html>

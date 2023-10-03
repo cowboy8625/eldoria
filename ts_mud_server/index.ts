@@ -37,6 +37,7 @@ type User = {
 
 type Mob = {
   hp: number;
+  user_idx?: number;
 }
 
 type Data = {
@@ -66,16 +67,13 @@ wsApp.ws('/ws', (ws: WebSocket) => {
         return;
       }
       const attackPower = Math.floor(Math.random() * 100);
-      if (Math.floor(Math.random())) {
-        user.hp -= attackPower;
-      } else {
-        monster.hp -= attackPower;
-      }
+      monster.hp -= attackPower;
       console.log('attack', attackPower);
       sendData({message: `you attacked a monster a moster for ${attackPower}`, hp: user?.hp}, ws);
       if (monster.hp <= 0) {
         sendData({message: 'you kill the monster!', hp: user?.hp}, ws);
         monster.hp = 100;
+
       }
     } else {
       broadcast(message, ws);
@@ -105,25 +103,41 @@ const sendData = (data: Data, ws: WebSocket) => {
   ws.send(JSON.stringify(data));
 };
 
-async function sleep(ms: number) {
+
+async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
+
+
+function randomInt(min: number, max: number): number {
+  const randomDecimal = Math.random();
+  const randomInRange = min + (randomDecimal * (max - min));
+  return Math.floor(randomInRange);
+}
+
+function saturatingSub(a: number, b: number): number {
+  return Math.max(0, Math.min(a, b));
+}
+
 
 // Game Loop
 async function main() {
   while (true) {
     await sleep(1000);
-    const command = commandQueue.unshift();
-    if (!command) {
+    if (!monster?.user_idx && Math.random() < 0.5 && users.length > 0) {
+      monster = {
+        user_idx: randomInt(0, users.length),
+        hp: 100,
+      };
+
+    }
+    if (monster.user_idx === undefined) {
       continue;
     }
-    switch (command) {
-      case COMMAND.ATTACK:
-        break;
-
-      default:
-        break;
-    }
+    const attackPower = Math.floor(Math.random() * 10);
+    const user: User = users[monster?.user_idx];
+    user.hp -= attackPower;
+    sendData({message: `you was attacked by a monster for ${attackPower}`, hp: user?.hp}, user.ws);
   }
 }
 

@@ -1,3 +1,8 @@
+* {
+  box-sizing: border-box;
+  background-color: #000;
+}
+
 .containter {
   display: flex;
   flex-direction: column;
@@ -10,18 +15,26 @@
   flex: 8;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  color: #fff;
 }
 
-.create-messages {
+.health-power {
+  color: #fff;
+}
+
+.health-power span {
+  padding: 10;
+}
+
+.create-message {
   flex: 1;
   display: flex;
-  width: 100vw;
+  width: 99vw;
 }
 
-.create-messages form input {
-  width: 100%;
+.message-box {
   flex: 1;
+  display: flex;
+  width: 99vw;
+  color: #fff;
 }
-
