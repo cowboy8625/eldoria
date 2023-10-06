@@ -12,9 +12,19 @@
       <div class="inbox">
         <ul id="messages"></ul>
       </div>
-      <div class="health-power">
-        <span>HP</span>
-        <span id="hp">0</span>
+      <div class="stats">
+        <span class="red">
+          HP:
+          <span id="hp"></span>
+        </span>
+        <span class="gray">
+          Region:
+          <span id="region-name"></span>
+        </span>
+        <span class="gray">
+          Room:
+          <span id="room-name"></span>
+        </span>
       </div>
       <div class="create-message" >
         <form id="form-data">
@@ -30,6 +40,8 @@
     </div>
     <script>
       const hpElement = document.getElementById('hp');
+      const roomNameElement = document.getElementById('room-name');
+      const regionNameElement = document.getElementById('region-name');
       const ws = new WebSocket(`ws://${location.host}/ws`);
 
       const formElement = document.getElementById('form-data');
@@ -53,6 +65,8 @@
         const data = JSON.parse(event.data);
         addMessage(data.message);
         updateHp(data.hp);
+        updateRoomName(data.room);
+        updateRegionName(data.region);
 
       });
 
@@ -70,6 +84,20 @@
           return;
         }
         hpElement.textContent = hp;
+      }
+
+      function updateRoomName(room) {
+        if (!room) {
+          return;
+        }
+        roomNameElement.textContent = room;
+      }
+
+      function updateRegionName(region) {
+        if (!region) {
+          return;
+        }
+        regionNameElement.textContent = region;
       }
     </script>
   </body>

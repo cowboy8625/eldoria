@@ -1,5 +1,5 @@
-import { Stats, Player } from './component';
-import { sleep } from './utils';
+import { Stats, Player, Location } from './component';
+import { sleep } from './utils/mod';
 import express from 'express';
 import expressWs from 'express-ws';
 import { WebSocket } from 'ws';
@@ -11,7 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 type Message = {
   message: string;
-  ws: WebSocket;
+  sendBy: WebSocket;
+  receivedBy: WebSocket[];
 };
 
 let messageToSendToClients: Message[] = [];
@@ -23,6 +24,17 @@ wsApp.ws('/ws', (ws: WebSocket) => {
   console.log('connected');
   const player = initPlayerEntity(ws);
   world.push(player);
+
+  const message = 'Welcome to Eldoria!';
+  const { health } = player.components.stats as Stats;
+  const { region, room } = player.components.location as Location;
+
+  ws.send(JSON.stringify({
+    message,
+    hp: health,
+    region,
+    room,
+  }));
 
   // On receiving a message User Command will be created and added to queue.
   ws.on('message', (mgs: string) => webSocketMessageHandler(mgs, ws));
@@ -37,8 +49,8 @@ app.listen(PORT, () => {
   console.log(`message: server started on port ${PORT}`);
 });
 
-function webSocketMessageHandler(message: string, ws: WebSocket) {
-  messageToSendToClients.push({ message, ws });
+function webSocketMessageHandler(message: string, sendBy: WebSocket) {
+  messageToSendToClients.push({ message, sendBy, receivedBy: [] });
 }
 
 function initPlayerEntity(socket: WebSocket): Entity {
@@ -47,37 +59,48 @@ function initPlayerEntity(socket: WebSocket): Entity {
     components: {
       stats: { health: 100 },
       player: { socket },
+      location: { region: 'earth', room: 'usa' },
     },
   };
 }
 
-
 const broadcaseSystem: System = (entities: Entity[]) => {
-  const query = queryEntities(entities, 'player');
+  if (!messageToSendToClients) return;
+  const query = queryEntities(entities, 'player', 'location');
   for (const { components } of query) {
     const { health } = components.stats as Stats;
     const { socket } = components.player as Player;
-    let sentMessage: number[] = []
-    messageToSendToClients.forEach((msg, idx) => {
-      const { message, ws } = msg as Message;
-      if (socket !== ws) {
-        sentMessage.push(idx);
-        socket.send(JSON.stringify({ message, hp: health }));
+    const { region, room } = components.location as Location;
+    messageToSendToClients.forEach((msg: Message) => {
+      if (socket !== msg.sendBy && !msg.receivedBy.includes(socket)) {
+        msg.receivedBy.push(socket);
+        socket.send(JSON.stringify({
+          message: msg.message,
+          hp: health,
+          region,
+          room,
+        }));
+      }
+      if (socket === msg.sendBy && !msg.receivedBy.includes(socket)) {
+        msg.receivedBy.push(socket);
+        const formatedMessage = `you send -> ${msg.message}`;
+        socket.send(JSON.stringify({
+          message: formatedMessage,
+          hp: health,
+          region,
+          room,
+        }));
       }
     });
-    sentMessage.forEach((idx) => {
-      messageToSendToClients.splice(idx, 1);
-    })
   }
 };
 
-const playerAttackSystem: System = (entities: Entity[]) => {
+const playerMovementSystem: System = (entities: Entity[]) => {
 };
 
 const systems: System[] = [
-  playerAttackSystem,
+  playerMovementSystem,
   broadcaseSystem,
-  playerAttackSystem,
 ];
 
 

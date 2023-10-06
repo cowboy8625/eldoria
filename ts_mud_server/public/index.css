@@ -3,6 +3,22 @@
   background-color: #000;
 }
 
+.gray {
+  color: gray;
+}
+
+.red {
+  color: red;
+}
+
+.blue {
+  color: blue;
+}
+
+.cyan {
+  color: cyan;
+}
+
 .containter {
   display: flex;
   flex-direction: column;
@@ -18,8 +34,10 @@
   color: #fff;
 }
 
-.health-power {
-  color: #fff;
+.stats {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
 }
 
 .health-power span {

@@ -10,3 +10,9 @@ export const StatsSchema = z.object({
   health: z.number(),
 });
 export type Stats = z.infer<typeof StatsSchema>;
+
+export const LocationSchema = z.object({
+  region: z.string(),
+  room: z.string(),
+})
+export type Location = z.infer<typeof LocationSchema>;
