@@ -7,7 +7,7 @@ import { System, Entity, createId, queryEntities } from "./ecs/mod";
 
 const app = express();
 const { app: wsApp } = expressWs(app);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.ELDORIA_PORT || 3000;
 
 type Message = {
   message: string;
