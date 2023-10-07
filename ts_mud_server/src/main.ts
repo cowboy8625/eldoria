@@ -1,9 +1,9 @@
-import { Stats, Player, Location } from './component';
-import { sleep } from './utils/mod';
-import express from 'express';
-import expressWs from 'express-ws';
-import { WebSocket } from 'ws';
-import { System, Entity, createId, queryEntities } from './ecs/mod';
+import { Stats, Player, Location } from "./component";
+import { sleep } from "./utils/mod";
+import express from "express";
+import expressWs from "express-ws";
+import { WebSocket } from "ws";
+import { System, Entity, createId, queryEntities } from "./ecs/mod";
 
 const app = express();
 const { app: wsApp } = expressWs(app);
@@ -18,30 +18,32 @@ type Message = {
 let messageToSendToClients: Message[] = [];
 let world: Entity[] = [];
 
-app.use(express.static('public'));
+app.use(express.static("public"));
 
-wsApp.ws('/ws', (ws: WebSocket) => {
-  console.log('connected');
+wsApp.ws("/ws", (ws: WebSocket) => {
+  console.log("connected");
   const player = initPlayerEntity(ws);
   world.push(player);
 
-  const message = 'Welcome to Eldoria!';
+  const message = "Welcome to Eldoria!";
   const { health } = player.components.stats as Stats;
   const { region, room } = player.components.location as Location;
 
-  ws.send(JSON.stringify({
-    message,
-    hp: health,
-    region,
-    room,
-  }));
+  ws.send(
+    JSON.stringify({
+      message,
+      hp: health,
+      region,
+      room,
+    }),
+  );
 
   // On receiving a message User Command will be created and added to queue.
-  ws.on('message', (mgs: string) => webSocketMessageHandler(mgs, ws));
+  ws.on("message", (mgs: string) => webSocketMessageHandler(mgs, ws));
 
   // On closing of a connection need to remove Socket from users array
-  ws.on('close', () => {
-    console.log('disconnected');
+  ws.on("close", () => {
+    console.log("disconnected");
   });
 });
 
@@ -50,7 +52,10 @@ app.listen(PORT, () => {
 });
 
 function webSocketMessageHandler(message: string, sendBy: WebSocket) {
-  messageToSendToClients.push({ message, sendBy, receivedBy: [] });
+  if (message.toLowerCase() === "/attack") {
+  } else {
+    messageToSendToClients.push({ message, sendBy, receivedBy: [] });
+  }
 }
 
 function initPlayerEntity(socket: WebSocket): Entity {
@@ -59,50 +64,75 @@ function initPlayerEntity(socket: WebSocket): Entity {
     components: {
       stats: { health: 100 },
       player: { socket },
-      location: { region: 'earth', room: 'usa' },
+      location: { region: "earth", room: "usa" },
     },
   };
 }
 
+const broadcastOtherUsers = (
+  msg: Message,
+  health: number,
+  region: string,
+  room: string,
+  socket: WebSocket,
+) => {
+  if (socket === msg.sendBy && !msg.receivedBy.includes(socket)) {
+    return;
+  }
+  msg.receivedBy.push(socket);
+  socket.send(
+    JSON.stringify({
+      message: msg.message,
+      hp: health,
+      region,
+      room,
+    }),
+  );
+};
+
+const broadcastBackToSender = (
+  msg: Message,
+  health: number,
+  region: string,
+  room: string,
+  socket: WebSocket,
+) => {
+  if (socket !== msg.sendBy && !msg.receivedBy.includes(socket)) {
+    return;
+  }
+  msg.receivedBy.push(socket);
+  const formatedMessage = `you send -> ${msg.message}`;
+  socket.send(
+    JSON.stringify({
+      message: formatedMessage,
+      hp: health,
+      region,
+      room,
+    }),
+  );
+};
+
 const broadcaseSystem: System = (entities: Entity[]) => {
   if (!messageToSendToClients) return;
-  const query = queryEntities(entities, 'player', 'location');
+  const query = queryEntities(entities, "player", "location");
   for (const { components } of query) {
     const { health } = components.stats as Stats;
     const { socket } = components.player as Player;
     const { region, room } = components.location as Location;
     messageToSendToClients.forEach((msg: Message) => {
-      if (socket !== msg.sendBy && !msg.receivedBy.includes(socket)) {
-        msg.receivedBy.push(socket);
-        socket.send(JSON.stringify({
-          message: msg.message,
-          hp: health,
-          region,
-          room,
-        }));
-      }
-      if (socket === msg.sendBy && !msg.receivedBy.includes(socket)) {
-        msg.receivedBy.push(socket);
-        const formatedMessage = `you send -> ${msg.message}`;
-        socket.send(JSON.stringify({
-          message: formatedMessage,
-          hp: health,
-          region,
-          room,
-        }));
-      }
+      broadcastOtherUsers(msg, health, region, room, socket);
+      broadcastBackToSender(msg, health, region, room, socket);
     });
   }
+  messageToSendToClients = [];
 };
 
-const playerMovementSystem: System = (entities: Entity[]) => {
+const plyaerCommandSystem: System = (entities: Entity[]) => {
 };
 
-const systems: System[] = [
-  playerMovementSystem,
-  broadcaseSystem,
-];
+const playerMovementSystem: System = (entities: Entity[]) => {};
 
+const systems: System[] = [playerMovementSystem, broadcaseSystem];
 
 // Game Loop
 async function main() {
@@ -110,8 +140,8 @@ async function main() {
     await sleep(1000);
     systems.forEach((system: System) => {
       system(world);
-    })
+    });
   }
 }
 
-main()
+main();

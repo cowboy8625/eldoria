@@ -1,23 +1,21 @@
-import { z } from 'zod';
-
+import { z } from "zod";
 
 export function createId(): string {
-  return (+new Date()).toString(16)+(Math.random()+100_000_000|0).toString(16);
+  return (
+    (+new Date()).toString(16) +
+    ((Math.random() + 100_000_000) | 0).toString(16)
+  );
 }
-
 
 // export const PositionComponentSchema = z.object({
 //   x: z.number(),
 //   y: z.number(),
 // });
 
-
 // export const RenderableComponentSchema = z.object({
 //   sprite: z.string(),
 // });
 //
-
-
 
 // export type PositionComponent = z.infer<typeof PositionComponentSchema>;
 // export type RenderableComponent = z.infer<typeof RenderableComponentSchema>;
@@ -31,9 +29,15 @@ export type Entity = z.infer<typeof EntitySchema>;
 export const SystemSchema = z.function().args(z.array(EntitySchema));
 export type System = z.infer<typeof SystemSchema>;
 
-export function queryEntities(entities: Entity[], ...componentTypes: (keyof Entity['components'])[]): Entity[] {
+export function queryEntities(
+  entities: Entity[],
+  ...componentTypes: (keyof Entity["components"])[]
+): Entity[] {
   return entities.filter((entity) => {
-    return all<keyof Entity['components']>(componentTypes, item => !!entity.components[item]);
+    return all<keyof Entity["components"]>(
+      componentTypes,
+      (item) => !!entity.components[item],
+    );
   });
 }
 

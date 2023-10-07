@@ -21,24 +21,24 @@ export class Option<T> {
   }
 
   public static none<T>(): Option<T> {
-    return new Option({tag: 'None'});
+    return new Option({ tag: "None" });
   }
 
   public static some<T>(value: T): Option<T> {
-    return new Option<T>({tag: 'Some', value});
+    return new Option<T>({ tag: "Some", value });
   }
 
   public isNone(): boolean {
-    return this.value.tag === 'None';
+    return this.value.tag === "None";
   }
 
   public isSome(): boolean {
-    return this.value.tag === 'Some';
+    return this.value.tag === "Some";
   }
 
   public unwrap(): T | never {
     if (this.isNone()) {
-      throw new Error('Option is None and cannot be unwrapped');
+      throw new Error("Option is None and cannot be unwrapped");
     }
     const value = this.value as Some<T>;
     return value.value;
