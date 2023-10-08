@@ -76,7 +76,7 @@ const broadcastOtherUsers = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket === msg.sendBy && !msg.receivedBy.includes(socket)) {
+  if (socket === msg.sendBy && msg.receivedBy.includes(socket)) {
     return;
   }
   msg.receivedBy.push(socket);
@@ -97,7 +97,7 @@ const broadcastBackToSender = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket !== msg.sendBy && !msg.receivedBy.includes(socket)) {
+  if (socket !== msg.sendBy && msg.receivedBy.includes(socket)) {
     return;
   }
   msg.receivedBy.push(socket);
