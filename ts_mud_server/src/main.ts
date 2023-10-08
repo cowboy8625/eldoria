@@ -12,7 +12,6 @@ const PORT = process.env.ELDORIA_PORT || 3000;
 type Message = {
   message: string;
   sendBy: WebSocket;
-  receivedBy: WebSocket[];
 };
 
 let messageToSendToClients: Message[] = [];
@@ -21,7 +20,7 @@ let world: Entity[] = [];
 app.use(express.static("public"));
 
 wsApp.ws("/ws", (ws: WebSocket) => {
-  console.log("connected");
+  console.log("connected: ", ws.url);
   const player = initPlayerEntity(ws);
   world.push(player);
 
@@ -54,7 +53,7 @@ app.listen(PORT, () => {
 function webSocketMessageHandler(message: string, sendBy: WebSocket) {
   if (message.toLowerCase() === "/attack") {
   } else {
-    messageToSendToClients.push({ message, sendBy, receivedBy: [] });
+    messageToSendToClients.push({ message, sendBy});
   }
 }
 
@@ -76,10 +75,9 @@ const broadcastOtherUsers = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket === msg.sendBy && msg.receivedBy.includes(socket)) {
+  if (socket === msg.sendBy) {
     return;
   }
-  msg.receivedBy.push(socket);
   socket.send(
     JSON.stringify({
       message: msg.message,
@@ -97,10 +95,9 @@ const broadcastBackToSender = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket !== msg.sendBy && msg.receivedBy.includes(socket)) {
+  if (socket !== msg.sendBy) {
     return;
   }
-  msg.receivedBy.push(socket);
   const formatedMessage = `you send -> ${msg.message}`;
   socket.send(
     JSON.stringify({
@@ -120,8 +117,8 @@ const broadcaseSystem: System = (entities: Entity[]) => {
     const { socket } = components.player as Player;
     const { region, room } = components.location as Location;
     messageToSendToClients.forEach((msg: Message) => {
-      broadcastOtherUsers(msg, health, region, room, socket);
       broadcastBackToSender(msg, health, region, room, socket);
+      broadcastOtherUsers(msg, health, region, room, socket);
     });
   }
   messageToSendToClients = [];
