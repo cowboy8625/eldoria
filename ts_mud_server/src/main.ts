@@ -4,6 +4,7 @@ import express from "express";
 import expressWs from "express-ws";
 import { WebSocket } from "ws";
 import { System, Entity, createId, queryEntities } from "./ecs/mod";
+import { World } from "./world/mod";
 
 const app = express();
 const { app: wsApp } = expressWs(app);
@@ -14,7 +15,13 @@ type Message = {
   sendBy: WebSocket;
 };
 
+type Command = {
+  message: string;
+  sendBy: WebSocket;
+};
+
 let messageToSendToClients: Message[] = [];
+let queueCommand: Command[] = [];
 let world: Entity[] = [];
 
 app.use(express.static("public"));
@@ -37,10 +44,7 @@ wsApp.ws("/ws", (ws: WebSocket) => {
     }),
   );
 
-  // On receiving a message User Command will be created and added to queue.
   ws.on("message", (mgs: string) => webSocketMessageHandler(mgs, ws));
-
-  // On closing of a connection need to remove Socket from users array
   ws.on("close", () => {
     console.log("disconnected");
   });
@@ -51,7 +55,12 @@ app.listen(PORT, () => {
 });
 
 function webSocketMessageHandler(message: string, sendBy: WebSocket) {
-  if (message.toLowerCase() === "/attack") {
+  if (message.toLowerCase().startsWith("/")) {
+    console.log("look around");
+    queueCommand.push({
+      message,
+      sendBy,
+    });
   } else {
     messageToSendToClients.push({ message, sendBy});
   }
@@ -63,7 +72,7 @@ function initPlayerEntity(socket: WebSocket): Entity {
     components: {
       stats: { health: 100 },
       player: { socket },
-      location: { region: "earth", room: "usa" },
+      location: { region: "The Verdant Glades", room: "Eldertree Grove" },
     },
   };
 }
@@ -111,7 +120,7 @@ const broadcastBackToSender = (
 
 const broadcaseSystem: System = (entities: Entity[]) => {
   if (!messageToSendToClients) return;
-  const query = queryEntities(entities, "player", "location");
+  const query = queryEntities(entities, "player", "location", "stats");
   for (const { components } of query) {
     const { health } = components.stats as Stats;
     const { socket } = components.player as Player;
@@ -125,11 +134,35 @@ const broadcaseSystem: System = (entities: Entity[]) => {
 };
 
 const plyaerCommandSystem: System = (entities: Entity[]) => {
+  if (!queueCommand) return;
+  const query = queryEntities(entities, "player", "location", "stats");
+  for (const { components } of query) {
+    const { health } = components.stats as Stats;
+    const { socket } = components.player as Player;
+    const { region, room } = components.location as Location;
+    queueCommand.forEach((msg: Command) => {
+      socket.send(JSON.stringify({
+        message: 'Looking arround you see.......',
+      }));
+      socket.send(JSON.stringify({
+        message: World[region][room].description,
+      }));
+      socket.send(JSON.stringify({
+        message: World[region][room].movements,
+      }));
+    })
+  }
+  queueCommand = [];
 };
 
-const playerMovementSystem: System = (entities: Entity[]) => {};
+const playerMovementSystem: System = (entities: Entity[]) => {
+};
 
-const systems: System[] = [playerMovementSystem, broadcaseSystem];
+const systems: System[] = [
+  playerMovementSystem,
+  broadcaseSystem,
+  plyaerCommandSystem,
+];
 
 // Game Loop
 async function main() {
