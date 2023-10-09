@@ -43,7 +43,7 @@
       const hpElement = document.getElementById('hp');
       const roomNameElement = document.getElementById('room-name');
       const regionNameElement = document.getElementById('region-name');
-      const ws = new WebSocket(`wss://${location.host}/ws`);
+      const ws = new WebSocket(`ws://${location.host}/ws`);
 
       const formElement = document.getElementById('form-data');
       formElement.addEventListener('submit', (event) => {
@@ -76,6 +76,7 @@
           return;
         }
         const message = document.createElement('li');
+        message.classList.add('wrap');
         message.textContent = text;
         document.getElementById('messages').appendChild(message);
       }

@@ -5,6 +5,7 @@ import expressWs from "express-ws";
 import { WebSocket } from "ws";
 import { System, Entity, createId, queryEntities } from "./ecs/mod";
 import { World } from "./world/mod";
+import { log } from "console";
 
 const app = express();
 const { app: wsApp } = expressWs(app);
@@ -12,12 +13,12 @@ const PORT = process.env.ELDORIA_PORT || 3000;
 
 type Message = {
   message: string;
-  sendBy: WebSocket;
+  sentBy: WebSocket;
 };
 
 type Command = {
   message: string;
-  sendBy: WebSocket;
+  sentBy: WebSocket;
 };
 
 let messageToSendToClients: Message[] = [];
@@ -54,15 +55,15 @@ app.listen(PORT, () => {
   console.log(`message: server started on port ${PORT}`);
 });
 
-function webSocketMessageHandler(message: string, sendBy: WebSocket) {
+function webSocketMessageHandler(message: string, sentBy: WebSocket) {
   if (message.toLowerCase().startsWith("/")) {
     console.log("look around");
     queueCommand.push({
       message,
-      sendBy,
+      sentBy,
     });
   } else {
-    messageToSendToClients.push({ message, sendBy});
+    messageToSendToClients.push({ message, sentBy});
   }
 }
 
@@ -84,7 +85,7 @@ const broadcastOtherUsers = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket === msg.sendBy) {
+  if (socket === msg.sentBy) {
     return;
   }
   socket.send(
@@ -104,7 +105,7 @@ const broadcastBackToSender = (
   room: string,
   socket: WebSocket,
 ) => {
-  if (socket !== msg.sendBy) {
+  if (socket !== msg.sentBy) {
     return;
   }
   const formatedMessage = `you send -> ${msg.message}`;
@@ -133,14 +134,14 @@ const broadcaseSystem: System = (entities: Entity[]) => {
   messageToSendToClients = [];
 };
 
-const plyaerCommandSystem: System = (entities: Entity[]) => {
+const lookAroundSystem: System = (entities: Entity[]) => {
   if (!queueCommand) return;
-  const query = queryEntities(entities, "player", "location", "stats");
+  const query = queryEntities(entities, "player", "location");
   for (const { components } of query) {
-    const { health } = components.stats as Stats;
     const { socket } = components.player as Player;
     const { region, room } = components.location as Location;
-    queueCommand.forEach((msg: Command) => {
+    const systemCommands = filterCommands(socket, "/look around");
+    systemCommands.forEach((i: number) => {
       socket.send(JSON.stringify({
         message: 'Looking arround you see.......',
       }));
@@ -148,20 +149,47 @@ const plyaerCommandSystem: System = (entities: Entity[]) => {
         message: World[region][room].description,
       }));
       socket.send(JSON.stringify({
-        message: World[region][room].movements,
+        message: Object.entries(World[region][room].movements)
+          .map(([key, value]) => {
+            return `${key}: ${value as string}`
+        })
       }));
+      queueCommand.splice(i, 1);
     })
   }
-  queueCommand = [];
 };
 
 const playerMovementSystem: System = (entities: Entity[]) => {
+  if (!queueCommand) return;
+  const query = queryEntities(entities, "player", "location");
+  for (const { components } of query) {
+    const { socket } = components.player as Player;
+    let location = components.location as Location;
+    const systemCommands = filterCommands(socket, "/north");
+    systemCommands.forEach((i: number) => {
+      const north = World[location.region][location.room].movements.north;
+      location.room = north;
+      socket.send(JSON.stringify({
+        message: `You move north to ${north}`,
+        room: location.room,
+      }));
+      queueCommand.splice(i, 1);
+    });
+  }
 };
+
+function filterCommands(socket: WebSocket, filterBy: string): number[] {
+  const systemCommands = queueCommand
+    .filter((cmd: Command) => cmd.sentBy === socket && cmd.message === filterBy)
+    .map((_: Command, i: number) => i);
+  systemCommands.reverse();
+  return systemCommands;
+}
 
 const systems: System[] = [
   playerMovementSystem,
   broadcaseSystem,
-  plyaerCommandSystem,
+  lookAroundSystem,
 ];
 
 // Game Loop

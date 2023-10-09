@@ -3,6 +3,10 @@
   background-color: #000;
 }
 
+body {
+  overflow: hidden;
+}
+
 .gray {
   color: gray;
 }
@@ -17,6 +21,10 @@
 
 .cyan {
   color: cyan;
+}
+
+.wrap {
+  word-wrap: break-word;
 }
 
 .containter {

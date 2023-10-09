@@ -55,9 +55,7 @@ let SilvershadeVillage = {
     `,
   items,
   movements: {
-    north: [
-      "Eldertree Grove",
-    ]
+    north: "Eldertree Grove",
   }
 };
 

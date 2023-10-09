@@ -40,9 +40,7 @@ let EldertreeGrove: Record<string, any> = {
     `,
   items,
   movements: {
-    "north": [
-      "Silvershade Village",
-    ]
+    north: "Silvershade Village",
   }
 };
 
