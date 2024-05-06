@@ -1,5 +1,5 @@
-use clap::{crate_name, crate_version, Parser, Subcommand};
 use anyhow::Result;
+use clap::{crate_name, crate_version, Parser, Subcommand};
 
 const AUTHOR: &str = "cowboy8625";
 
@@ -49,6 +49,12 @@ enum Commands {
             default_value_t = String::from("9009"),
         )]
         port: String,
+
+        #[arg(long, short = 'U', value_name = "USERNAME")]
+        username: String,
+
+        #[arg(long, short = 'P', value_name = "PASSWORD")]
+        password: String,
     },
 }
 
@@ -59,8 +65,13 @@ async fn main() -> Result<()> {
         Commands::Server { host, port } => {
             server::run(&host, &port).await?;
         }
-        Commands::Client { host, port } => {
-            terminal_client::run(&host, &port).await?;
+        Commands::Client {
+            host,
+            port,
+            username,
+            password,
+        } => {
+            terminal_client::run(&host, &port, &username, &password).await?;
         }
     }
     Ok(())

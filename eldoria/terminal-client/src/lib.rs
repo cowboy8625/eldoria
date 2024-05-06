@@ -1,10 +1,13 @@
-use serde::{Deserialize, Serialize};
-use tokio::{net::TcpStream, sync::broadcast};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, WriteHalf},
+    net::TcpStream,
+    sync::broadcast,
+};
 
 use anyhow::Result;
 use server::CommandType;
 
-pub async fn run(host: &str, port: &str) -> Result<()> {
+pub async fn run(host: &str, port: &str, username: &str, password: &str) -> Result<()> {
     let Ok(adder) = format!("{host}:{port}").parse::<std::net::SocketAddr>() else {
         eprintln!("Failed to parse address: {host}:{port}");
         return Ok(());
@@ -18,12 +21,25 @@ pub async fn run(host: &str, port: &str) -> Result<()> {
             eprintln!("Failed to connect {:?}", error);
         }
     }
-    let Ok(stream) = TcpStream::connect(adder).await else {
+    let Ok(mut stream) = TcpStream::connect(adder).await else {
         eprintln!("Failed to connect");
         return Ok(());
     };
 
     let (tx, rx) = broadcast::channel(10);
+
+    let login_command = CommandType::Login {
+        username: username.to_string(),
+        password: password.to_string(),
+    };
+
+    let Ok(data) = bincode::serialize::<CommandType>(&login_command) else {
+        eprintln!("Failed to deserialize event");
+        return Ok(());
+    };
+
+    stream.write_all(&data).await?;
+    stream.flush().await?;
 
     tokio::spawn(async move {
         let tx = tx.clone();
@@ -42,12 +58,11 @@ pub async fn run(host: &str, port: &str) -> Result<()> {
             }
 
             let Ok(event) = bincode::deserialize::<CommandType>(&buf) else {
-                eprintln!("Failed to deserialize event");
                 continue;
             };
 
             let Ok(_) = tx.send(event) else {
-                eprintln!("Failed to send event");
+                eprintln!("Failed to send event\r");
                 continue;
             };
         }
@@ -84,6 +99,8 @@ mod app {
         rx: broadcast::Receiver<CommandType>,
         is_running: bool,
         text: String,
+        state: State,
+        messages: Vec<Message>,
     }
 
     impl App {
@@ -94,6 +111,8 @@ mod app {
                 rx,
                 is_running: true,
                 text: String::new(),
+                state: State::LoggedOut,
+                messages: Vec::new(),
             })
         }
 
@@ -101,7 +120,20 @@ mod app {
             let mut terminal: Tui = Terminal::new(CrosstermBackend::new(stdout()))?;
             while self.is_running {
                 if let Ok(data) = self.rx.try_recv() {
-                    self.text = format!("{data:?}");
+                    match data {
+                        CommandType::LoggedIn(_) => {
+                            self.state = State::Loggedin;
+                        }
+                        CommandType::Message { name, msg } => {
+                            self.messages.push(Message {
+                                username: name,
+                                msg,
+                            });
+                        }
+                        CommandType::Echo(msg) => self.text = msg,
+                        CommandType::Error(_) => todo!(),
+                        _ => {}
+                    }
                 }
                 terminal.draw(|f| self.handle_render(f))?;
                 if event::poll(std::time::Duration::from_millis(50))? {
@@ -136,5 +168,15 @@ mod app {
                 .execute(LeaveAlternateScreen)
                 .expect("Could not leave alternate screen");
         }
+    }
+
+    struct Message {
+        username: String,
+        msg: String,
+    }
+
+    enum State {
+        LoggedOut,
+        Loggedin,
     }
 }

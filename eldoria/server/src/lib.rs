@@ -1,10 +1,10 @@
 // TODO:
 // On connection user should supply username and password otherwise Create command should be used
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use anyhow::Result;
 
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, WriteHalf},
@@ -34,29 +34,90 @@ pub async fn run(host: &str, port: &str) -> Result<()> {
 
         tokio::spawn(async move {
             let (reader, mut writer) = socket.split();
-            let mut reader = BufReader::new(reader);
 
-            let mut line = String::new();
             let mut state = {
                 let data = players_list.lock().await;
                 if data.contains_key(&addr) {
-                    tx.send(Command {
-                        socket: addr,
-                        command: CommandType::Echo("username: ".into()),
-                    })
-                    .unwrap();
                     State::Connected
                 } else {
-                    tx.send(Command {
-                        socket: addr,
-                        command: CommandType::Echo("username: ".into()),
-                    })
-                    .unwrap();
                     State::Create
                 }
             };
 
             loop {
+                let mut buf = Vec::new();
+                let Ok(_) = reader.readable().await else {
+                    continue;
+                };
+
+                let Ok(_) = reader.try_read_buf(&mut buf) else {
+                    continue;
+                };
+
+                let Ok(data) = bincode::deserialize::<CommandType>(&buf) else {
+                    return;
+                };
+                tx.send(Command {
+                    socket: addr,
+                    command: CommandType::Echo(format!("received: {:?}", data.clone())),
+                })
+                .unwrap();
+                match &mut state {
+                    State::Create => match data.clone() {
+                        CommandType::Login { username, password } => {
+                            let Some(user) = lookup_player(&username, &password) else {
+                                let command = CommandType::Error(ServerError::InvalidCredentials);
+                                let Ok(data) = bincode::serialize(&command) else {
+                                    return;
+                                };
+                                let _ = writer.write_all(&data).await;
+                                return;
+                            };
+                            let Ok(data) = bincode::serialize(&CommandType::LoggedIn(user)) else {
+                                return;
+                            };
+                            let _ = writer.write_all(&data).await;
+                            state = State::Connected;
+                        }
+                        CommandType::Create { .. } => {
+                            tx.send(Command {
+                                socket: addr,
+                                command: CommandType::Echo(format!("invalid command: {data:?}")),
+                            })
+                            .unwrap();
+                        }
+                        _ => {
+                            let command = CommandType::Echo(format!("invalid command: {data:?}"));
+                            let Ok(data) = bincode::serialize(&command) else {
+                                return;
+                            };
+                            let _ = writer.write_all(&data).await;
+                        } // if result.unwrap_or_default() == 0 {
+                          //     continue;
+                          // }
+                          // let name = line.trim().to_string();
+                          // eprintln!("name: {}", name);
+                          // players_list.lock().await.insert(addr, Player { name });
+                          // line.clear();
+                          // state = State::Connected;
+                    },
+                    State::Connected => {
+                        // if result.unwrap_or_default() == 0 {
+                        //     break;
+                        // }
+                        // match line.trim() {
+                        //     "online" => {
+                        //         tx.send(Command{socket: addr, command: CommandType::WhosOnline}).unwrap();
+                        //     }
+                        //     msg => {
+                        //         let name = players_list.lock().await.get(&addr).unwrap().name.clone();
+                        //         tx.send(Command{socket: addr, command: CommandType::Message{name, msg: msg.into()}}).unwrap();
+                        //     }
+                        // }
+                        // line.clear();
+                    }
+                }
+
                 tokio::select! {
                     // Handle Commands that come from other players
                     result = rx.recv() => {
@@ -117,37 +178,31 @@ pub async fn run(host: &str, port: &str) -> Result<()> {
                         }
                     }
                     // Handle State changes
-                    result = reader.read_line(&mut line) => {
-                        match &mut state {
-                            State::Create => {
-                                if result.unwrap_or_default() == 0 {
-                                    continue;
-                                }
-                                let name = line.trim().to_string();
-                                players_list.lock().await.insert(addr, Player { name });
-                                line.clear();
-                                state = State::Connected;
-                            },
-                            State::Connected => {
-                                if result.unwrap_or_default() == 0 {
-                                    break;
-                                }
-                                match line.trim() {
-                                    "online" => {
-                                        tx.send(Command{socket: addr, command: CommandType::WhosOnline}).unwrap();
-                                    }
-                                    msg => {
-                                        let name = players_list.lock().await.get(&addr).unwrap().name.clone();
-                                        tx.send(Command{socket: addr, command: CommandType::Message{name, msg: msg.into()}}).unwrap();
-                                    }
-                                }
-                                line.clear();
-                            },
-                        }
-                    }
                 }
             }
         });
+    }
+}
+
+fn lookup_player(username: &str, password: &str) -> Option<User> {
+    if username == "admin" && password == "admin" {
+        Some(User {
+            username: "admin".to_string(),
+            privlege: Privilege::Admin,
+            player: Player {
+                name: "admin dude".to_string(),
+            },
+        })
+    } else if username == "username" && password == "password" {
+        Some(User {
+            username: "user".to_string(),
+            privlege: Privilege::User,
+            player: Player {
+                name: "user guy".to_string(),
+            },
+        })
+    } else {
+        None
     }
 }
 
@@ -166,16 +221,35 @@ struct Command {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CommandType {
     Login { username: String, password: String },
+    LoggedIn(User),
     Create { username: String, password: String },
     WhosOnline,
     Message { name: String, msg: String },
     Echo(String),
-    Error(String),
+    Error(ServerError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ServerError {
+    InvalidCredentials,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct User {
+    username: String,
+    privlege: Privilege,
+    player: Player,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Privilege {
+    Admin,
+    User,
 }
 
 // ------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Player {
     name: String,
 }
