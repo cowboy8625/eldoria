@@ -1,0 +1,14 @@
+[package]
+name = "eldoria"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+server = { path = "server" }
+terminal-client = { path = "terminal-client" }
+tokio = { version="1.37.0", features=["full"] }
+clap = { version = "4.5.4", features = ["cargo", "derive"] }
+anyhow = "1.0.82"
+
+[workspace]
+members = ["server", "terminal-client"]
